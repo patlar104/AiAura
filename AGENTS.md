@@ -32,5 +32,5 @@ See `README.md` for full commands. Quick reference:
 - **DISPLAY:** The virtual display is at `:1`. Always export `DISPLAY=:1` before running the Desktop app.
 - **Wasm browser target:** The Wasm target may encounter a `kotlin.js.JsException: Cannot read properties of undefined (reading 'optParameter')` error in the browser. This is a known Kotlin/Wasm toolchain issue in this environment. The JS target (`jsBrowserDevelopmentRun`) or Desktop JVM target are more reliable for manual testing.
 - **iOS target:** Cannot build on Linux — requires macOS + Xcode.
-- **Gradle daemon:** The first Gradle invocation downloads Gradle 8.14.3 and all dependencies, which takes several minutes. Subsequent builds use the configuration cache and are much faster.
+- **Gradle daemon:** The first Gradle invocation downloads the required Gradle version and all dependencies, which takes several minutes. Subsequent builds use the configuration cache and are much faster.
 - All Gradle commands should include `JAVA_HOME` and `ANDROID_HOME` env vars (already in `~/.bashrc` after setup).
