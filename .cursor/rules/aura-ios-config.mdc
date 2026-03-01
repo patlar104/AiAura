@@ -1,0 +1,15 @@
+---
+description: AiAura iOS app and Config — minimal Swift, metadata in Config.xcconfig
+globs: "iosApp/**/*","**/Config.xcconfig"
+alwaysApply: false
+---
+
+# iOS App and Config
+
+When editing `iosApp/` or `Config.xcconfig`:
+
+1. **Keep iOS Swift entry code minimal** — Prefer implementing behavior in shared Kotlin (e.g. `composeApp/src/commonMain` or `iosMain`). Use Swift only for the app entry and any required iOS-specific wiring.
+
+2. **App metadata and signing** — Use `iosApp/Configuration/Config.xcconfig` for app identifiers, version numbers, and signing-related values. Change them in one place and verify the iOS build in Xcode.
+
+3. **iOS framework** — Build the shared framework with `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode` (macOS only); then build/run the app from Xcode. Do not claim iOS build success on Linux.

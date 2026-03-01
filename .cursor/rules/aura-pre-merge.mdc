@@ -1,0 +1,26 @@
+---
+description: AiAura pre-merge checklist — run before claiming work complete or merging
+globs: "composeApp/src/**/*"
+alwaysApply: false
+---
+
+# Pre-Merge Checklist
+
+Before claiming a feature or fix is complete (or before merge):
+
+1. **Source-set placement** — Code is in the correct source set (`commonMain` first; platform folders only for platform APIs).
+
+2. **Dependencies** — New dependencies are in the right scope and, if applicable, versions are in `gradle/libs.versions.toml`.
+
+3. **Tests** — If the change touches code covered by tests, run the relevant test task: `./gradlew :composeApp:jvmTest`, `jsTest`, `wasmJsTest`, or Android tests.
+
+4. **Builds** — At least one successful build per **impacted** platform:
+   - Android: `./gradlew :composeApp:assembleDebug`
+   - Desktop: `./gradlew :composeApp:run`
+   - JS Web: `./gradlew :composeApp:jsBrowserDevelopmentRun`
+   - Wasm Web: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun`
+   - iOS (macOS only): `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode` then build in Xcode.
+
+5. **UI changes** — If UI was changed, verify on Android, iOS (if on macOS), and at least one web target.
+
+Do not state that the change is complete or ready to merge without having run the relevant checks and reported results.

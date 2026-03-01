@@ -34,3 +34,19 @@ See `README.md` for full commands. Quick reference:
 - **iOS target:** Cannot build on Linux — requires macOS + Xcode.
 - **Gradle daemon:** The first Gradle invocation downloads the required Gradle version and all dependencies, which takes several minutes. Subsequent builds use the configuration cache and are much faster.
 - All Gradle commands should include `JAVA_HOME` and `ANDROID_HOME` env vars (already in `~/.bashrc` after setup).
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on push/PR to main/master:
+
+- **Compile:** JVM, JS, Wasm
+- **Tests:** jvmTest, jsTest, wasmJsTest
+- **Android:** assembleDebug, lintDebug
+
+iOS and Desktop run are not in CI (require macOS / display). Keeps required build checks (PROJECT_RULES.md §5) automated.
+
+## Project-specific subagents, skills, and rules
+
+- **Subagent prompts** — `.cursor/SUBAGENTS.md` has copy-paste prompts for KMP source-set explorer, build verifier, expect/actual reviewer, Gradle checker, pre-merge runner, and Compose placement checker. Use them when launching subagents (e.g. `mcp_task`) so the subagent follows AiAura rules.
+- **Project skills** — `.cursor/skills/` contains AiAura skills: `aura-kmp-source-set`, `aura-build-verification`, `aura-expect-actual`, `aura-dependency-scope`. They trigger on source-set placement, builds, expect/actual, and dependency/version changes.
+- **File-scoped rules** — `.cursor/rules/` includes `aura-project-rules.mdc` (always on) plus: `aura-compose-sources.mdc` (Kotlin under `composeApp/src`), `aura-gradle-config.mdc` (*.gradle.kts), `aura-versions-toml.mdc` (libs.versions.toml), `aura-ios-config.mdc` (iosApp/, Config.xcconfig), and `aura-pre-merge.mdc` (pre-merge checklist when touching app source). These apply automatically when matching files are in context.

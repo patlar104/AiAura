@@ -1,5 +1,7 @@
 This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM).
 
+**For AI agents:** See [AGENTS.md](./AGENTS.md) for build/test commands and environment; see [PROJECT_RULES.md](./PROJECT_RULES.md) for source-set rules and required checks.
+
 * [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
   It contains several subfolders:
   - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.

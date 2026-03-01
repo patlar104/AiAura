@@ -1,0 +1,17 @@
+---
+description: AiAura Compose and Kotlin source-set rules for code under composeApp/src
+globs: composeApp/src/**/*.kt
+alwaysApply: false
+---
+
+# Compose App Source Rules
+
+When editing Kotlin under `composeApp/src/`:
+
+1. **Place shared code in the correct source set:** `commonMain` for UI and business logic that has no platform API dependency; use `androidMain`, `iosMain`, `jvmMain`, `jsMain`, `webMain`, or `wasmJsMain` only for platform-specific APIs.
+
+2. **commonMain must not import** platform-specific packages (e.g. `android.*`, `java.*` for JDK-only, `kotlinx.browser`, iOS-specific). Use **expect/actual** instead: declare the API in commonMain, implement in each platform source set.
+
+3. **Compose UI and theming** that are shared across platforms belong in `commonMain`. Platform-specific UI (e.g. Android system UI) goes in the matching platform source set.
+
+4. **Tests:** Shared test code and test-only dependencies go in `commonTest`; platform-specific tests in the corresponding platform test source set.

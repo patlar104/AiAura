@@ -1,0 +1,17 @@
+---
+description: AiAura Gradle and version config ownership — where to edit build and dependencies (build.gradle.kts, settings.gradle.kts, gradle/libs.versions.toml)
+globs: "**/*.gradle.kts"
+alwaysApply: false
+---
+
+# Gradle and Version Config Rules
+
+When editing build or dependency config in this project:
+
+1. **Target and source-set wiring** and dependency declarations (e.g. `implementation`, `sourceSets`) live in `composeApp/build.gradle.kts`. Root `build.gradle.kts` and `settings.gradle.kts` are for project-wide setup.
+
+2. **Dependency and plugin versions** are centralized in `gradle/libs.versions.toml`. When adding or updating a library version, add or update the entry there and reference it via the version catalog in the relevant `build.gradle.kts`.
+
+3. **Do not edit** generated or tooling output: `build/`, `composeApp/build/`, `.gradle/`, `.kotlin/`. Do not manually edit IDE metadata under `.idea/` unless the change is intentionally IDE-specific.
+
+4. When adding a dependency, specify the **correct source-set scope** (e.g. `commonMain`, `androidMain`) so it is available only where needed. After changing dependencies, run the relevant build for the affected target.

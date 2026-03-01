@@ -2,6 +2,8 @@
 
 **For AI agents:** When working on this repo, read and follow this file. Use it for: where to put code (commonMain vs platform folders), what not to edit (generated/build/IDE), expect/actual usage, and which build commands to run before claiming success.
 
+**Canonical Cursor rules:** The rules that Cursor injects live in `.cursor/rules/` (e.g. `aura-project-rules.mdc`). When updating project rules, keep this file and `.cursor/rules/` in sync.
+
 These rules keep Android, iOS, Desktop, Web (JS), and Web (Wasm) working together in this Kotlin Multiplatform project.
 
 ## 1) Edit Location Rules

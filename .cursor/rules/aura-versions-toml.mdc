@@ -1,0 +1,15 @@
+---
+description: AiAura version catalog — dependency and plugin versions live here
+globs: "**/libs.versions.toml"
+alwaysApply: false
+---
+
+# Version Catalog (libs.versions.toml)
+
+When editing this file:
+
+1. **All dependency and plugin versions** for the project are centralized here. Add or update the version entry here; reference it from `build.gradle.kts` via the version catalog (e.g. `libs.kotlin.multiplatform`).
+
+2. Do not duplicate version numbers in `build.gradle.kts`; use the catalog alias so upgrades happen in one place.
+
+3. After changing versions, run the relevant build (e.g. `./gradlew :composeApp:compileKotlinJvm` or `assembleDebug`) to confirm nothing breaks.
