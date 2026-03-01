@@ -14,6 +14,50 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
 * [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
 
+## AiAura private chat assistant setup (Gemini + Firebase)
+
+The shared `App()` now includes:
+
+- Private Gemini chat replies (your API key)
+- Optional Firebase cloud history sync across devices
+- Manual "Load Cloud" and "Save Cloud" controls plus automatic save after each assistant reply
+
+### 1) Gemini
+
+1. Create a Gemini API key in Google AI Studio.
+2. Open the app and set:
+   - `Gemini API key`
+   - `Gemini model` (default: `gemini-2.5-flash`)
+
+### 2) Firebase (optional, for cross-device history)
+
+1. Create a Firebase project.
+2. Enable **Email/Password** provider in Firebase Authentication.
+3. Create one user account (email + password) for yourself.
+4. Create a Firestore database.
+5. Add these values in app settings:
+   - `Firebase Web API key`
+   - `Firebase project id`
+   - `Firebase email`
+   - `Firebase password`
+
+Use the same Firebase credentials on every device to sync one shared history.
+
+### 3) Firestore rules suggestion (private app)
+
+For private, self-use apps, lock reads/writes to authenticated users:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/conversations/{conversationId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+```
+
 ### Build and Run Android Application
 
 To build and run the development version of the Android app, use the run configuration from the run widget
