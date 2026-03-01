@@ -1,0 +1,56 @@
+---
+description: AiAura Kotlin Multiplatform project rules — source sets, build config, expect/actual, and required build checks
+alwaysApply: true
+---
+
+# Project Rules (AiAura)
+
+Follow these rules when editing this repo. They keep Android, iOS, Desktop, Web (JS), and Web (Wasm) working together.
+
+## 1) Edit Location Rules
+
+1. Put shared UI and business logic in `composeApp/src/commonMain`.
+2. Only use platform folders for platform-only APIs:
+   - Android: `composeApp/src/androidMain`
+   - iOS Kotlin bridge: `composeApp/src/iosMain`
+   - Desktop JVM: `composeApp/src/jvmMain`
+   - JS Web: `composeApp/src/jsMain` and `composeApp/src/webMain`
+   - Wasm Web: `composeApp/src/wasmJsMain`
+3. Keep iOS Swift entry code in `iosApp/iosApp` minimal. Prefer implementing behavior in shared Kotlin code.
+
+## 2) Build Configuration Ownership
+
+1. Keep target/dependency/source-set wiring in `composeApp/build.gradle.kts`.
+2. Keep dependency and plugin versions centralized in `gradle/libs.versions.toml`.
+3. Keep iOS app metadata/signing values in `iosApp/Configuration/Config.xcconfig`.
+4. Only change app identifiers/version numbers in one place per platform, then verify build.
+
+## 3) Do Not Edit Generated/Tooling Output
+
+Do not manually edit: `build/`, `composeApp/build/`, `.gradle/`, `.kotlin/`, or IDE metadata under `.idea/` unless the change is intentionally IDE-specific.
+
+## 4) Source-Set Safety Rules
+
+1. `commonMain` must not import Android/iOS/JVM/browser-specific APIs.
+2. Platform-specific implementations must satisfy shared `expect` contracts.
+3. If adding platform behavior, prefer `expect/actual` pattern over `if`-style platform branching.
+
+## 5) Required Build Checks Before Merge
+
+After meaningful changes, run:
+
+- Android: `./gradlew :composeApp:assembleDebug`
+- Desktop: `./gradlew :composeApp:run`
+- JS Web: `./gradlew :composeApp:jsBrowserDevelopmentRun`
+- Wasm Web: `./gradlew :composeApp:wasmJsBrowserDevelopmentRun`
+- iOS framework: `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode`
+- iOS app: open `iosApp` in Xcode and build/run there.
+
+## 6) Change Checklist
+
+For every feature or fix:
+
+1. Confirm correct source-set placement (`commonMain` first).
+2. Confirm dependencies were added in the right scope.
+3. Confirm at least one build command for each impacted platform passes.
+4. If UI changed, verify Android + iOS + one web target.
