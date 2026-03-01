@@ -21,6 +21,8 @@ The shared `App()` now includes:
 - Private Gemini chat replies (your API key)
 - Optional Firebase cloud history sync across devices
 - Manual "Load Cloud" and "Save Cloud" controls plus automatic save after each assistant reply
+- Quick prompt buttons, retry-last action, and typing indicator
+- Advanced Gemini controls (`system instruction`, `temperature`, `max output tokens`)
 
 ### 1) Gemini
 

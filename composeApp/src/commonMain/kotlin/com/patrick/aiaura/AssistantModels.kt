@@ -3,6 +3,9 @@ package com.patrick.aiaura
 data class AssistantConfig(
     val geminiApiKey: String = "",
     val geminiModel: String = "gemini-2.5-flash",
+    val systemInstruction: String = "You are AiAura, a private personal AI assistant. Be concise, practical, and clear.",
+    val temperature: String = "0.7",
+    val maxOutputTokens: String = "1024",
     val firebaseApiKey: String = "",
     val firebaseProjectId: String = "",
     val firebaseEmail: String = "",
@@ -16,6 +19,10 @@ data class AssistantConfig(
             firebaseProjectId.isNotBlank() &&
             firebaseEmail.isNotBlank() &&
             firebasePassword.isNotBlank()
+
+    val hasAdvancedGeminiValues: Boolean
+        get() = temperature.toDoubleOrNull() != null &&
+            maxOutputTokens.toIntOrNull() != null
 }
 
 enum class MessageRole {

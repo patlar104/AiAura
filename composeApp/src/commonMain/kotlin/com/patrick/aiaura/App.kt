@@ -4,14 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,9 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+
+private val QUICK_PROMPTS = listOf(
+    "Plan my day in 5 bullet points.",
+    "Draft a concise professional email.",
+    "Give me 3 creative ideas for tonight.",
+)
 
 @Composable
 @Preview
@@ -47,11 +57,13 @@ fun App() {
 private fun AiAuraAssistantApp() {
     val service = remember { GeminiFirebaseService() }
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
 
     var config by remember { mutableStateOf(AssistantConfig()) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     var draft by rememberSaveable { mutableStateOf("") }
     var showSettings by rememberSaveable { mutableStateOf(true) }
+    var lastUserPrompt by remember { mutableStateOf<String?>(null) }
 
     var isSending by remember { mutableStateOf(false) }
     var isSyncing by remember { mutableStateOf(false) }
@@ -61,6 +73,15 @@ private fun AiAuraAssistantApp() {
     fun runFailure(message: String, throwable: Throwable) {
         statusMessage = message
         errorMessage = throwable.message ?: "Unknown error"
+    }
+
+    val visibleMessageCount = messages.size + if (isSending) 1 else 0
+    val canSend = draft.isNotBlank() && !isSending && config.hasGeminiConfig
+
+    LaunchedEffect(visibleMessageCount) {
+        if (visibleMessageCount > 0) {
+            listState.animateScrollToItem(visibleMessageCount - 1)
+        }
     }
 
     fun saveToCloud() {
@@ -101,11 +122,17 @@ private fun AiAuraAssistantApp() {
         }
     }
 
-    fun sendMessage() {
-        val text = draft.trim()
+    fun sendMessage(explicitText: String? = null) {
+        val text = explicitText?.trim() ?: draft.trim()
         if (text.isEmpty() || isSending) return
+        if (!config.hasGeminiConfig) {
+            statusMessage = "Add a Gemini API key before sending."
+            errorMessage = null
+            return
+        }
 
         messages.add(ChatMessage.user(text))
+        lastUserPrompt = text
         draft = ""
         errorMessage = null
         statusMessage = "Waiting for Gemini..."
@@ -134,6 +161,11 @@ private fun AiAuraAssistantApp() {
         }
     }
 
+    fun retryLastPrompt() {
+        if (lastUserPrompt == null || isSending || isSyncing) return
+        sendMessage(explicitText = lastUserPrompt)
+    }
+
     Column(
         modifier = Modifier
             .safeContentPadding()
@@ -148,6 +180,12 @@ private fun AiAuraAssistantApp() {
         Text(
             text = "Use the same Firebase credentials on every device to sync one private chat history.",
             style = MaterialTheme.typography.bodyMedium,
+        )
+
+        ReadinessRow(
+            hasGemini = config.hasGeminiConfig,
+            hasCloud = config.hasFirebaseConfig,
+            hasAdvancedGeminiValues = config.hasAdvancedGeminiValues,
         )
 
         SettingsCard(
@@ -185,9 +223,11 @@ private fun AiAuraAssistantApp() {
             shape = RoundedCornerShape(14.dp),
             tonalElevation = 1.dp,
         ) {
-            if (messages.isEmpty()) {
+            if (messages.isEmpty() && !isSending) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -199,35 +239,54 @@ private fun AiAuraAssistantApp() {
             } else {
                 LazyColumn(
                     modifier = Modifier
-                        .fillMaxHeight()
                         .fillMaxWidth()
                         .padding(10.dp),
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     itemsIndexed(messages) { _, message ->
                         MessageBubble(message = message)
                     }
+                    if (isSending) {
+                        item {
+                            TypingBubble()
+                        }
+                    }
                 }
             }
         }
 
-        Row(
+        QuickPromptsRow(
+            onPromptClicked = { draft = it },
+            enabled = !isSending,
+        )
+
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = draft,
                 onValueChange = { draft = it },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 label = { Text("Message") },
                 placeholder = { Text("Ask anything...") },
                 minLines = 1,
                 maxLines = 4,
                 enabled = !isSending,
             )
+
+            if (!config.hasGeminiConfig) {
+                Text(
+                    text = "Gemini API key required before sending messages.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
             Button(
-                onClick = ::sendMessage,
-                enabled = draft.isNotBlank() && !isSending,
+                onClick = { sendMessage() },
+                enabled = canSend,
             ) {
                 if (isSending) {
                     CircularProgressIndicator(
@@ -238,39 +297,140 @@ private fun AiAuraAssistantApp() {
                     Text("Send")
                 }
             }
-        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilledTonalButton(
-                onClick = ::loadFromCloud,
-                enabled = !isSending && !isSyncing,
-            ) {
-                if (isSyncing) {
-                    Text("Working...")
-                } else {
-                    Text("Load Cloud")
-                }
-            }
-            FilledTonalButton(
-                onClick = ::saveToCloud,
-                enabled = !isSending && !isSyncing && messages.isNotEmpty(),
-            ) {
-                Text("Save Cloud")
-            }
-            FilledTonalButton(
-                onClick = {
+            ActionButtonsRow(
+                isSending = isSending,
+                isSyncing = isSyncing,
+                hasMessages = messages.isNotEmpty(),
+                hasLastPrompt = lastUserPrompt != null,
+                onLoadCloud = ::loadFromCloud,
+                onSaveCloud = ::saveToCloud,
+                onRetry = ::retryLastPrompt,
+                onClear = {
                     messages.clear()
                     statusMessage = "Chat cleared locally."
                     errorMessage = null
                 },
-                enabled = !isSending && !isSyncing && messages.isNotEmpty(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuickPromptsRow(
+    onPromptClicked: (String) -> Unit,
+    enabled: Boolean,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(QUICK_PROMPTS) { prompt ->
+            FilledTonalButton(
+                onClick = { onPromptClicked(prompt) },
+                enabled = enabled,
+            ) {
+                Text(prompt, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButtonsRow(
+    isSending: Boolean,
+    isSyncing: Boolean,
+    hasMessages: Boolean,
+    hasLastPrompt: Boolean,
+    onLoadCloud: () -> Unit,
+    onSaveCloud: () -> Unit,
+    onRetry: () -> Unit,
+    onClear: () -> Unit,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            FilledTonalButton(
+                onClick = onLoadCloud,
+                enabled = !isSending && !isSyncing,
+            ) {
+                Text(if (isSyncing) "Working..." else "Load Cloud")
+            }
+        }
+        item {
+            FilledTonalButton(
+                onClick = onSaveCloud,
+                enabled = !isSending && !isSyncing && hasMessages,
+            ) {
+                Text("Save Cloud")
+            }
+        }
+        item {
+            FilledTonalButton(
+                onClick = onRetry,
+                enabled = !isSending && !isSyncing && hasLastPrompt,
+            ) {
+                Text("Retry Last")
+            }
+        }
+        item {
+            FilledTonalButton(
+                onClick = onClear,
+                enabled = !isSending && !isSyncing && hasMessages,
             ) {
                 Text("Clear")
             }
         }
+    }
+}
+
+@Composable
+private fun ReadinessRow(
+    hasGemini: Boolean,
+    hasCloud: Boolean,
+    hasAdvancedGeminiValues: Boolean,
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            ReadinessBadge(
+                label = if (hasGemini) "Gemini ready" else "Gemini missing",
+                ok = hasGemini,
+            )
+        }
+        item {
+            ReadinessBadge(
+                label = if (hasCloud) "Cloud sync ready" else "Cloud sync optional",
+                ok = hasCloud,
+            )
+        }
+        item {
+            ReadinessBadge(
+                label = if (hasAdvancedGeminiValues) "Advanced config valid" else "Check advanced config",
+                ok = hasAdvancedGeminiValues,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReadinessBadge(
+    label: String,
+    ok: Boolean,
+) {
+    Surface(
+        shape = RoundedCornerShape(100.dp),
+        color = if (ok) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
     }
 }
 
@@ -319,6 +479,30 @@ private fun SettingsCard(
                     placeholder = { Text("gemini-2.5-flash") },
                     enabled = controlsEnabled,
                 )
+                OutlinedTextField(
+                    value = config.systemInstruction,
+                    onValueChange = { onConfigChange(config.copy(systemInstruction = it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("System instruction") },
+                    minLines = 2,
+                    maxLines = 4,
+                    enabled = controlsEnabled,
+                )
+                OutlinedTextField(
+                    value = config.temperature,
+                    onValueChange = { onConfigChange(config.copy(temperature = it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Temperature (0.0 - 2.0)") },
+                    enabled = controlsEnabled,
+                )
+                OutlinedTextField(
+                    value = config.maxOutputTokens,
+                    onValueChange = { onConfigChange(config.copy(maxOutputTokens = it)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Max output tokens (1 - 8192)") },
+                    enabled = controlsEnabled,
+                )
+
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = config.firebaseApiKey,
@@ -355,6 +539,10 @@ private fun SettingsCard(
                     text = "Gemini key is required for replies. Fill Firebase settings to enable cloud history sync.",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                Text(
+                    text = "Tip: gemini-2.5-flash is a solid default for low-latency chat.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
@@ -368,6 +556,7 @@ private fun MessageBubble(message: ChatMessage) {
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         Surface(
+            modifier = Modifier.fillMaxWidth(0.88f),
             shape = RoundedCornerShape(14.dp),
             color = if (isUser) {
                 MaterialTheme.colorScheme.primary
@@ -394,6 +583,32 @@ private fun MessageBubble(message: ChatMessage) {
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypingBubble() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.55f),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.height(14.dp), strokeWidth = 2.dp)
+                Text(
+                    text = "AiAura is thinking...",
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }

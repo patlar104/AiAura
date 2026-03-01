@@ -16,7 +16,6 @@ import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -39,13 +38,12 @@ class GeminiFirebaseService(
         require(config.hasGeminiConfig) {
             "Gemini API key is missing. Open Settings and set a key."
         }
+        validateGeminiAdvancedConfig(config)
 
         val endpoint =
             "https://generativelanguage.googleapis.com/v1beta/models/${config.geminiModel}:generateContent" +
                 "?key=${config.geminiApiKey}"
-        val payload = buildJsonObject {
-            put("contents", buildGeminiContents(history.takeLast(MAX_CONTEXT_MESSAGES)))
-        }
+        val payload = buildGeminiRequestPayload(config, history)
 
         val response = httpClient.post(endpoint) {
             contentType(ContentType.Application.Json)
@@ -189,6 +187,76 @@ internal fun buildGeminiContents(history: List<ChatMessage>): JsonArray {
     }
 }
 
+internal fun buildGeminiRequestPayload(
+    config: AssistantConfig,
+    history: List<ChatMessage>,
+): JsonObject {
+    val temperature = parseGeminiTemperature(config.temperature)
+    val maxOutputTokens = parseGeminiMaxOutputTokens(config.maxOutputTokens)
+    val systemInstruction = config.systemInstruction.trim().takeIf { it.isNotEmpty() }
+
+    return buildJsonObject {
+        put("contents", buildGeminiContents(history.takeLast(MAX_CONTEXT_MESSAGES)))
+
+        if (systemInstruction != null) {
+            put(
+                "systemInstruction",
+                buildJsonObject {
+                    put(
+                        "parts",
+                        buildJsonArray {
+                            add(buildJsonObject { put("text", JsonPrimitive(systemInstruction)) })
+                        },
+                    )
+                },
+            )
+        }
+
+        val generationConfig = buildGeminiGenerationConfig(
+            temperature = temperature,
+            maxOutputTokens = maxOutputTokens,
+        )
+        if (generationConfig.isNotEmpty()) {
+            put("generationConfig", generationConfig)
+        }
+    }
+}
+
+internal fun buildGeminiGenerationConfig(
+    temperature: Double?,
+    maxOutputTokens: Int?,
+): JsonObject {
+    return buildJsonObject {
+        if (temperature != null) {
+            put("temperature", JsonPrimitive(temperature))
+        }
+        if (maxOutputTokens != null) {
+            put("maxOutputTokens", JsonPrimitive(maxOutputTokens))
+        }
+    }
+}
+
+internal fun parseGeminiTemperature(rawValue: String): Double? {
+    val trimmed = rawValue.trim()
+    if (trimmed.isEmpty()) return null
+    return trimmed.toDoubleOrNull()?.takeIf { it in 0.0..2.0 }
+}
+
+internal fun parseGeminiMaxOutputTokens(rawValue: String): Int? {
+    val trimmed = rawValue.trim()
+    if (trimmed.isEmpty()) return null
+    return trimmed.toIntOrNull()?.takeIf { it in 1..8192 }
+}
+
+private fun validateGeminiAdvancedConfig(config: AssistantConfig) {
+    if (config.temperature.isNotBlank() && parseGeminiTemperature(config.temperature) == null) {
+        error("Temperature must be between 0.0 and 2.0.")
+    }
+    if (config.maxOutputTokens.isNotBlank() && parseGeminiMaxOutputTokens(config.maxOutputTokens) == null) {
+        error("Max output tokens must be an integer between 1 and 8192.")
+    }
+}
+
 internal fun parseGeminiReply(response: JsonObject): String {
     val text = response
         .jsonArrayOrNull("candidates")
@@ -196,11 +264,15 @@ internal fun parseGeminiReply(response: JsonObject): String {
         ?.jsonObjectOrNull()
         ?.jsonObjectOrNull("content")
         ?.jsonArrayOrNull("parts")
-        ?.firstOrNull()
-        ?.jsonObjectOrNull()
-        ?.stringOrNull("text")
-        ?.trim()
         .orEmpty()
+        .mapNotNull { part ->
+            part.jsonObjectOrNull()
+                ?.stringOrNull("text")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        }
+        .joinToString(separator = "\n")
+        .trim()
 
     if (text.isBlank()) {
         error("Gemini returned an empty answer. Try again or use a different model.")
@@ -290,13 +362,3 @@ private fun JsonElement.jsonObjectOrNull(): JsonObject? {
 private fun JsonElement.jsonArrayOrNull(): JsonArray? {
     return this as? JsonArray
 }
-
-@Suppress("unused")
-private fun JsonElement?.stringOrNull(): String? {
-    return (this as? JsonPrimitive)
-        ?.contentOrNull
-}
-
-@Suppress("unused")
-private val JsonElement?.isJsonNull: Boolean
-    get() = this == null || this === JsonNull
